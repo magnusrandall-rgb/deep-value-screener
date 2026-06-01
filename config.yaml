@@ -1,0 +1,87 @@
+# =============================================================================
+# Deep-Value Stock Screener — single source of all tunable knobs.
+# Logic NEVER hard-codes thresholds; edit them here and re-run.
+# =============================================================================
+
+# --- Stage 2: price screen -----------------------------------------------------
+price:
+  pct_off_ath: 50          # keep names down at least this % from all-time high
+  pct_above_52w_low: 20    # ...AND currently within this % of the 52-week low
+  ath_mode: approx-allowed # "true" = require real ATH only | "approx-allowed" = use max-over-history, flagged
+
+# --- Stage 0: hard floor (applied before everything) ---------------------------
+floor:
+  min_market_cap: 300_000_000          # in reporting_currency
+  min_avg_daily_dollar_volume: 1_000_000
+  min_years_listed: 5
+
+# --- Stage 3: quality ----------------------------------------------------------
+quality:
+  min_roic: 0.07                       # ~7% — a "good sign" threshold, scored not gated
+  min_years_history: 5
+  drop_if_never_profitable_last_n_years: 5   # the ONLY hard auto-drop in Stage 3
+
+# --- Stage 4: valuation / upside (RANKING ONLY — never a hard gate) ------------
+valuation:
+  annual_return_hurdle: 0.30           # ~30%/yr target, used to rank not to cut
+  bear_base_bull_deltas:
+    margin: [-0.30, 0.0, 0.30]         # multiplicative deltas vs normalized margin
+    multiple: [-0.25, 0.0, 0.25]       # multiplicative deltas vs normalized multiple
+  horizon_years: 3
+  # Normalized multiple = median of the company's OWN historical EV/EBIT (then
+  # EV/EBITDA) over available years with outlier years trimmed. Only when fewer
+  # than this many usable years exist do we fall back to a sector/quality band
+  # (and flag it + lower data-confidence). The multiple is never a pure function
+  # of the quality score.
+  min_years_for_historical_multiple: 3
+  fallback_multiple_band: [8, 16]      # EV/EBIT band used ONLY for the fallback
+  fallback_multiple_confidence_penalty: 0.85   # multiply data_confidence when fallback used
+  multiple_outlier_trim: true          # drop the single highest & lowest year when >= 5 points
+
+# --- Stage 1: universe ---------------------------------------------------------
+universe:
+  regions:
+    US: true
+    Japan: true
+    Europe: true
+    China: true
+  include_a_shares: false              # mainland A-shares off by default (poor free coverage)
+  a_share_confidence_penalty: 0.5      # if on, multiply their data-confidence by this
+  refresh_days: 7                      # rebuild ticker list weekly, not every run
+  # Yahoo suffixes per region. US has no suffix.
+  exchange_suffixes:
+    Japan:   [".T"]
+    Europe:  [".L", ".PA", ".AS", ".BR", ".LS", ".DE", ".SW", ".MI", ".MC", ".ST", ".OL", ".CO", ".HE"]
+    China:   [".HK"]                   # HK + US ADRs are the main Chinese exposure
+    China_a_shares: [".SS", ".SZ"]     # only used if include_a_shares: true
+  excluded_exchanges: []               # exact Yahoo suffixes to drop entirely
+  max_tickers: null                    # null = no cap (screen the full universe). Set an
+                                       # int only to throttle a local smoke test.
+
+# --- Stage 5: write-up ---------------------------------------------------------
+write_up:
+  engine: templated                    # "templated" (free, default) | "llm"
+  model: claude-haiku-4-5-20251001     # used only if engine == llm
+  max_output_tokens: 600               # per write-up cap (llm only)
+
+# --- Stage 6: feedback & self-learning ----------------------------------------
+feedback:
+  enabled: true
+  decisions_path: data/decisions.csv
+  suppress_previously_rejected: false  # false = still show, tagged; true = hide repeats
+  calibration_cadence_days: 30
+  outcomes_path: data/outcomes.csv
+
+# --- Global --------------------------------------------------------------------
+reporting_currency: USD
+
+email:
+  recipients:
+    - magnus.randall@yale.edu
+  # SMTP creds come from env / repo secrets, never here:
+  #   GMAIL_USER, GMAIL_APP_PASSWORD
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+
+schedule:
+  cron: "0 6 * * 1-5"   # 06:00 UTC weekdays (informational; real cron lives in the workflow)

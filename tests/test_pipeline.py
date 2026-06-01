@@ -1,0 +1,60 @@
+"""End-to-end offline pipeline test plus per-stage unit checks. No network."""
+from __future__ import annotations
+
+from screener.config import load_config
+from screener.pipeline import run_pipeline
+from screener.schema import StockRecord
+from screener.stages import floor, valuation
+
+
+def test_pipeline_offline_surfaces_deep_value_and_drops_junk():
+    cfg = load_config()
+    records = run_pipeline(cfg, allow_fetch=False)
+    tickers = {r.ticker for r in records}
+
+    # The profitable, beaten-down name is surfaced...
+    assert "DEEPUS" in tickers
+    # ...the never-profitable name is the one hard auto-drop.
+    assert "JUNKUS" not in tickers
+
+    deep = next(r for r in records if r.ticker == "DEEPUS")
+    assert deep.rank == 1
+    assert deep.pct_off_ath >= 50
+    assert deep.pct_above_52w_low <= 20
+    assert deep.quality_score is not None and deep.quality_score > 0
+    assert deep.writeup and "DEEPUS" in deep.writeup
+    assert 0 <= deep.data_confidence <= 1
+    # bear/base/bull must all be present (never a single point estimate)
+    assert deep.upside_bear is not None
+    assert deep.upside_base is not None
+    assert deep.upside_bull is not None
+
+
+def test_floor_requires_present_data():
+    cfg = load_config()
+    r = StockRecord(ticker="X", market_cap=None, avg_dollar_volume=5e6, years_listed=10)
+    assert floor.apply_floor([r], cfg) == []  # missing market cap fails the floor
+
+
+def test_valuation_ranks_but_does_not_gate():
+    cfg = load_config()
+    # Two names: one with strong base upside, one weak. Both must survive Stage 4.
+    strong = StockRecord(ticker="A", price=10, market_cap=1e9,
+                         revenue_history=[1e9], ebit_margin_history=[0.2],
+                         quality_score=80)
+    weak = StockRecord(ticker="B", price=10, market_cap=1e9,
+                       revenue_history=[1e9], ebit_margin_history=[0.01],
+                       quality_score=20)
+    ranked = valuation.value_stocks([weak, strong], cfg)
+    assert len(ranked) == 2                      # nothing dropped by valuation
+    assert ranked[0].ticker == "A"               # stronger upside ranks first
+    assert all(r.rank is not None for r in ranked)
+
+
+def test_ath_confidence_scored():
+    cfg = load_config()
+    records = run_pipeline(cfg, allow_fetch=False)
+    deep = next(r for r in records if r.ticker == "DEEPUS")
+    # ~6y history -> approximate ATH, confidence between 0 and 1, flagged as approx.
+    assert deep.ath_is_approx is True
+    assert 0 < deep.ath_confidence < 1

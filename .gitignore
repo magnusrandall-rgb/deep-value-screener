@@ -1,0 +1,21 @@
+# Caches & runtime data (kept out of the repo — only the tiny test fixture is committed)
+data/cache/
+data/universe.json
+data/results/
+data/prices/
+data/fundamentals/
+*.sqlite
+*.parquet
+
+# Secrets
+.env
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+.DS_Store

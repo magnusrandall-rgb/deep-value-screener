@@ -1,0 +1,52 @@
+# Permissive config used only by the test suite. Mirrors config.yaml shape.
+price:
+  pct_off_ath: 50
+  pct_above_52w_low: 20
+  ath_mode: approx-allowed
+floor:
+  min_market_cap: 100_000_000
+  min_avg_daily_dollar_volume: 1_000_000
+  min_years_listed: 3
+quality:
+  min_roic: 0.07
+  min_years_history: 3
+  drop_if_never_profitable_last_n_years: 5
+valuation:
+  annual_return_hurdle: 0.30
+  bear_base_bull_deltas:
+    margin: [-0.30, 0.0, 0.30]
+    multiple: [-0.25, 0.0, 0.25]
+  horizon_years: 3
+  min_years_for_historical_multiple: 3
+  fallback_multiple_band: [8, 16]
+  fallback_multiple_confidence_penalty: 0.85
+  multiple_outlier_trim: true
+universe:
+  regions: {US: true, Japan: true, Europe: true, China: true}
+  include_a_shares: false
+  a_share_confidence_penalty: 0.5
+  refresh_days: 7
+  exchange_suffixes:
+    Japan: [".T"]
+    Europe: [".L"]
+    China: [".HK"]
+    China_a_shares: [".SS", ".SZ"]
+  excluded_exchanges: []
+  max_tickers: null
+write_up:
+  engine: templated
+  model: claude-haiku-4-5-20251001
+  max_output_tokens: 600
+feedback:
+  enabled: true
+  decisions_path: data/decisions.csv
+  suppress_previously_rejected: false
+  calibration_cadence_days: 30
+  outcomes_path: data/outcomes.csv
+reporting_currency: USD
+email:
+  recipients: [test@example.com]
+  smtp_host: smtp.gmail.com
+  smtp_port: 587
+schedule:
+  cron: "0 6 * * 1-5"
