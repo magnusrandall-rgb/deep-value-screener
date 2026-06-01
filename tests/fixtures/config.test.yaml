@@ -44,9 +44,5 @@ feedback:
   calibration_cadence_days: 30
   outcomes_path: data/outcomes.csv
 reporting_currency: USD
-email:
-  recipients: [test@example.com]
-  smtp_host: smtp.gmail.com
-  smtp_port: 587
 schedule:
   cron: "0 6 * * 1-5"

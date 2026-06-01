@@ -40,19 +40,19 @@ jobs:
 
       - name: Run screen
         env:
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}  # only used if write_up.engine == llm
         run: python -m screener.run
 
-      # GitHub does NOT notify on failed scheduled runs. The screener emails on
-      # failure itself (see notify.send_failure), but this is a second safety net.
-      - name: Alert on failure
-        if: failure()
-        env:
-          GMAIL_USER: ${{ secrets.GMAIL_USER }}
-          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
-        run: python -m screener.run --offline || true
+      # Results (CSV/JSON/markdown) are saved to data/results/ and surfaced by the
+      # dashboard frontend; publish them as a build artifact for convenience.
+      # A failed run shows as a red check in GitHub (no email alert needed).
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: screen-results
+          path: data/results/
+          if-no-files-found: ignore
 
   keepalive:
     # Weekly empty commit so the schedule isn't auto-disabled after 60 days idle.

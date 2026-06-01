@@ -1,4 +1,4 @@
-"""Config validation + notification body rendering (no SMTP)."""
+"""Config validation + result-report rendering (no email/SMTP)."""
 from __future__ import annotations
 
 import pytest
@@ -25,8 +25,7 @@ def test_invalid_engine_rejected(tmp_path):
         load_config(bad)
 
 
-def test_email_body_highlights_new_entrants():
-    cfg = load_config()
+def test_report_body_highlights_new_entrants():
     r = StockRecord(ticker="DEEPUS", name="Deep Value Co", region="US",
                     exchange="NYSE", rank=1, pct_off_ath=65.0,
                     pct_above_52w_low=3.0, quality_score=72.0,
@@ -37,3 +36,12 @@ def test_email_body_highlights_new_entrants():
     assert "DEEPUS" in body
     assert "🆕" in body            # new entrant highlighted
     assert "not investment advice" in body
+
+
+def test_notify_has_no_email_machinery():
+    # Email/SMTP was removed; guard against it creeping back in.
+    import inspect
+    src = inspect.getsource(notify)
+    assert "smtplib" not in src
+    assert "GMAIL" not in src
+    assert not hasattr(notify, "send_results")

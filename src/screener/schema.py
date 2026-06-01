@@ -97,7 +97,7 @@ class StockRecord:
         return cls(**{k: v for k, v in d.items() if k in valid})
 
 
-# Column order used for the emailed/attached CSV (the skimmable shortlist).
+# Column order used for the saved CSV shortlist (consumed by the dashboard).
 SUMMARY_COLUMNS = [
     "rank", "ticker", "name", "region", "exchange", "sector",
     "pct_off_ath", "ath_is_approx", "pct_above_52w_low",

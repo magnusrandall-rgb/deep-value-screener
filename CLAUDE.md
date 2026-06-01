@@ -3,8 +3,9 @@
 ## Purpose
 A fully automated daily screener over **US, China, Japan, Europe** equities that
 surfaces beaten-down quality companies (good businesses at great prices going
-through temporary, fixable problems) and emails a ranked shortlist with a
-written analysis per name. Free data only. Research/idea-generation — **never
+through temporary, fixable problems), ranks them, writes a per-name analysis, and
+logs + saves the shortlist to `data/results/` (CSV/JSON/markdown) for a dashboard
+frontend. No email. Free data only. Research/idea-generation — **never
 auto-trades, never rank-and-forget.** Deliberate **false-positive bias**: better
 to review 30 and reject 25 than silently filter a great idea.
 
@@ -22,7 +23,7 @@ to review 30 and reject 25 than silently filter a great idea.
   - `pipeline.py` — the ONLY orchestrator (wires the stages).
   - `persist.py` — daily results storage + run-to-run diffing (new entrants).
   - `feedback.py` — Stage 6: decisions log, suppression, outcomes, calibration.
-  - `notify.py` — email body + CSV attach + new-entrant highlight + alerts.
+  - `notify.py` — terminal log + on-disk markdown report + new-entrant highlight (no email).
   - `run.py` — the ONLY entrypoint (also `decision` / `audit` subcommands).
 
 ## Inter-stage data contract

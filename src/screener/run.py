@@ -1,14 +1,14 @@
 """The only entrypoint.
 
 Commands:
-    python -m screener.run                 # full daily run (fetch + email)
+    python -m screener.run                 # full daily run (fetch, log, save)
     python -m screener.run --offline       # cache/fixture only, no network
-    python -m screener.run --no-email      # run + persist, skip email
     python -m screener.run decision TICKER reject "too levered"   # log a decision
     python -m screener.run audit           # print outcome audit (est vs actual)
 
-Exit code is non-zero on failure so CI can detect it; a failure email is also
-sent (GitHub Actions does not alert on failed scheduled runs).
+Results are logged to the terminal and saved to data/results/ (CSV, JSON, and a
+markdown report); a dashboard frontend consumes those. There is no email step.
+Exit code is non-zero on failure so CI can detect it.
 """
 from __future__ import annotations
 
@@ -79,32 +79,25 @@ def main(argv: list[str] | None = None) -> int:
         return _cmd_audit()
 
     offline = "--offline" in argv
-    no_email = "--no-email" in argv or offline
     force_universe = "--refresh-universe" in argv
     run_date = date.today().isoformat()
 
     cfg = load_config()
     try:
         records = run_pipeline(cfg, allow_fetch=not offline, force_universe=force_universe)
-    except Exception as e:
+    except Exception:
         tb = traceback.format_exc()
-        log.error("pipeline failed: %s", tb)
-        if not no_email:
-            notify.send_failure(cfg, tb, run_date)
+        notify.report_failure(tb, run_date)
         return 1
 
-    _, csv_path = persist.save_run(records, run_date)
+    persist.save_run(records, run_date)
     feedback.record_outcomes(records, cfg, when=run_date)
     digest = feedback.calibration_digest(cfg)
 
-    if no_email:
-        log.info("run complete (%d names), email skipped", len(records))
-        return 0
-
     if not records:
-        notify.send_heartbeat(cfg, run_date)
+        notify.report_heartbeat(cfg, run_date)
     else:
-        notify.send_results(records, cfg, csv_path, run_date, calibration=digest)
+        notify.report_results(records, cfg, run_date, calibration=digest)
     return 0
 
 

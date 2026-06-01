@@ -75,13 +75,8 @@ feedback:
 # --- Global --------------------------------------------------------------------
 reporting_currency: USD
 
-email:
-  recipients:
-    - magnus.randall@yale.edu
-  # SMTP creds come from env / repo secrets, never here:
-  #   GMAIL_USER, GMAIL_APP_PASSWORD
-  smtp_host: smtp.gmail.com
-  smtp_port: 587
+# Results are logged to the terminal and saved to data/results/ (CSV, JSON,
+# markdown) for the dashboard frontend. There is no email/SMTP delivery.
 
 schedule:
   cron: "0 6 * * 1-5"   # 06:00 UTC weekdays (informational; real cron lives in the workflow)

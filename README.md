@@ -3,7 +3,8 @@
 A fully automated daily screener over **US, China, Japan, and Europe** equities.
 It surfaces beaten-down quality businesses (long track records, temporary &
 fixable problems) that may be mispriced, ranks them, writes a short analysis of
-each, and emails you a skimmable shortlist with a full CSV attached.
+each, and logs + saves a skimmable shortlist to `data/results/` (CSV, JSON, and a
+markdown report) for a dashboard frontend to consume.
 
 > **This is a research / idea-generation tool, not investment advice.** It never
 > auto-trades and never rank-and-forgets. It is deliberately biased toward
@@ -31,35 +32,34 @@ coverage, ATH reliability, and fundamentals completeness.
 python -m venv .venv && source .venv/bin/activate
 pip install -e .              # installs deps from requirements.txt
 python -m pytest -q           # offline tests on a synthetic fixture (no network)
-python -m screener.run --offline    # dry run, no email, cache/fixture only
-python -m screener.run --no-email   # real fetch, persist, skip email
-python -m screener.run              # full daily run + email
+python -m screener.run --offline    # cache/fixture only, no network
+python -m screener.run              # full daily run: fetch, log, save to data/results/
 ```
 
+Each run logs a ranked summary to the terminal and writes `data/results/<date>.{csv,json,md}`.
+There is no email delivery — a dashboard frontend reads those files.
+
 ### Credentials (free)
-The screener needs no paid data. For email and the optional LLM write-up, set
-these as **environment variables / repo secrets** (never in code):
+The screener needs no paid data and no email credentials. The only optional
+secret is for the LLM write-up engine:
 
 | Secret | Needed for |
 |--------|-----------|
-| `GMAIL_USER` | sender address |
-| `GMAIL_APP_PASSWORD` | Gmail [app password](https://support.google.com/accounts/answer/185833) (not your login password) |
 | `ANTHROPIC_API_KEY` | only if `write_up.engine: llm` |
-
-If SMTP creds are missing the email is written to `data/results/` instead of
-sent, so local runs never fail.
 
 ## Deploy the scheduled job (GitHub Actions)
 
 1. Push to a **public** repo (unlimited free Actions minutes).
-2. Add the secrets above under **Settings → Secrets and variables → Actions**.
+2. (Optional) add `ANTHROPIC_API_KEY` under **Settings → Secrets and variables →
+   Actions** if you enable the LLM write-up engine. No email secrets are needed.
 3. `.github/workflows/daily.yml` runs at **06:00 UTC on weekdays** and on manual
    dispatch. It caches `data/` between runs (so only incremental price updates
-   are fetched) and pushes a weekly empty commit (**keepalive**) — GitHub
-   silently disables scheduled workflows after 60 days of repo inactivity.
-4. **Failure & heartbeat alerts:** GitHub does *not* notify on failed scheduled
-   runs, so the screener emails you on failure and on a "0 results" day. A silent
-   break can't quietly kill the daily consistency that is the real edge.
+   are fetched), uploads `data/results/` as a build artifact, and pushes a weekly
+   empty commit (**keepalive**) — GitHub silently disables scheduled workflows
+   after 60 days of repo inactivity.
+4. **Failure & heartbeat visibility:** a failed run shows as a red check in the
+   Actions UI, and a 0-result day logs a heartbeat line. The dashboard frontend
+   is responsible for surfacing results day to day.
 
 ## Tuning — everything lives in `config.yaml`
 
@@ -72,7 +72,7 @@ No threshold is hard-coded. Edit `config.yaml` and re-run. Key knobs:
 - `universe`: regions on/off, exchange suffixes, `include_a_shares` (+ confidence penalty).
 - `write_up`: `engine` (`templated` | `llm`), `model`.
 - `feedback`: `suppress_previously_rejected`, `calibration_cadence_days`, paths.
-- `reporting_currency`, `email.recipients`, `schedule.cron`.
+- `reporting_currency`, `schedule.cron`.
 
 ## The feedback loop (Stage 6)
 
