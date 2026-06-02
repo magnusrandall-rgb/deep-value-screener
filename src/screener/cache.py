@@ -84,6 +84,16 @@ def get_price_history(ticker: str, allow_fetch: bool = True) -> pd.DataFrame:
     return fresh
 
 
+def _fundamentals_usable(d: Optional[dict]) -> bool:
+    """True only if the dict carries real series. An empty dict (e.g. a transient
+    throttle that returned no data, or an old poisoned cache) must NOT count as a
+    valid cache — otherwise it silently starves the floor/quality stages and the
+    name is dropped for "missing" data that we never actually retried."""
+    if not d:
+        return False
+    return bool(d.get("share_count") or d.get("revenue") or d.get("ebit"))
+
+
 def get_fundamentals(ticker: str, region: str, allow_fetch: bool = True) -> dict:
     """Return normalized fundamentals dict, refreshing at most weekly."""
     path = _fund_path(ticker)
@@ -94,8 +104,10 @@ def get_fundamentals(ticker: str, region: str, allow_fetch: bool = True) -> dict
         except Exception:
             cached = None
 
+    # Only a *usable* recent cache counts as fresh; an empty cached dict is
+    # treated as stale so we re-fetch it instead of serving nothing.
     fresh_enough = False
-    if cached:
+    if _fundamentals_usable(cached):
         ts = cached.get("_fetched_at")
         if ts:
             age = datetime.utcnow() - datetime.fromisoformat(ts)
@@ -111,6 +123,10 @@ def get_fundamentals(ticker: str, region: str, allow_fetch: bool = True) -> dict
         return cached or {}
 
     data["_fetched_at"] = datetime.utcnow().isoformat()
+    # Never persist an empty/unusable result as if it were a real cache — that's
+    # exactly what would starve later stages and suppress the next re-fetch.
+    if not _fundamentals_usable(data):
+        return cached or data
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
         path.write_text(json.dumps(data))
