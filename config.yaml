@@ -11,8 +11,24 @@ price:
 
 # --- Stage 0: hard floor (applied before everything) ---------------------------
 floor:
-  min_market_cap: 300_000_000          # in the security's NATIVE currency (FX normalization removed)
-  min_avg_daily_dollar_volume: 1_000_000
+  # Figures are kept in each security's NATIVE currency (FX normalization removed),
+  # so floors are per-currency to stop a JPY/EUR micro-cap slipping a USD-sized
+  # floor. Keyed by yfinance financialCurrency; roughly FX-equivalent to ~300M USD
+  # market cap / ~1M USD ADV. `default` covers any currency not listed.
+  min_market_cap:
+    USD: 300_000_000
+    EUR: 280_000_000
+    GBP: 280_000_000
+    JPY: 45_000_000_000
+    HKD: 2_300_000_000
+    default: 300_000_000
+  min_avg_daily_dollar_volume:
+    USD: 1_000_000
+    EUR: 930_000
+    GBP: 930_000
+    JPY: 150_000_000
+    HKD: 7_700_000
+    default: 1_000_000
   min_years_listed: 5
 
 # --- Stage 3: quality ----------------------------------------------------------

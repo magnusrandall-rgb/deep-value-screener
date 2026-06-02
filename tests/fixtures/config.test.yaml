@@ -4,8 +4,14 @@ price:
   pct_above_52w_low: 20
   ath_mode: approx-allowed
 floor:
-  min_market_cap: 100_000_000
-  min_avg_daily_dollar_volume: 1_000_000
+  min_market_cap:
+    USD: 100_000_000
+    JPY: 15_000_000_000
+    default: 100_000_000
+  min_avg_daily_dollar_volume:
+    USD: 1_000_000
+    JPY: 150_000_000
+    default: 1_000_000
   min_years_listed: 3
 quality:
   min_roic: 0.07

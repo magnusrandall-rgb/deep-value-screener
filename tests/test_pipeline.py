@@ -36,6 +36,20 @@ def test_floor_requires_present_data():
     assert floor.apply_floor([r], cfg) == []  # missing market cap fails the floor
 
 
+def test_floor_uses_per_currency_threshold():
+    cfg = load_config()
+    # Same nominal market cap (5e9), different native currency. $5B clears the
+    # USD floor; ¥5B (~$33M) must fail the much larger JPY floor — so a JPY
+    # micro-cap can't slip a USD-sized floor.
+    usd = StockRecord(ticker="U", currency="USD", market_cap=5e9,
+                      avg_dollar_volume=5e8, years_listed=10)
+    jpy = StockRecord(ticker="J", currency="JPY", market_cap=5e9,
+                      avg_dollar_volume=5e8, years_listed=10)
+    kept = {r.ticker for r in floor.apply_floor([usd, jpy], cfg)}
+    assert "U" in kept
+    assert "J" not in kept
+
+
 def test_valuation_ranks_but_does_not_gate():
     cfg = load_config()
     # Two names: one with strong base upside, one weak. Both must survive Stage 4.
