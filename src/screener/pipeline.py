@@ -11,6 +11,7 @@ import logging
 
 from . import feedback, persist
 from .config import Config
+from .data import rate_limit
 from .schema import StockRecord
 from .stages import floor, price_screen, quality, valuation, writeup
 from .universe import build_universe
@@ -20,6 +21,16 @@ log = logging.getLogger("screener.pipeline")
 
 def run_pipeline(cfg: Config, allow_fetch: bool = True,
                  force_universe: bool = False) -> list[StockRecord]:
+    # Configure the network throttle from config so every live fetch is spaced
+    # out and backs off politely on a Yahoo 429 (no-op when allow_fetch=False).
+    fcfg = cfg.raw.get("fetch", {}) or {}
+    rate_limit.configure_throttle(
+        request_delay_seconds=fcfg.get("request_delay_seconds"),
+        max_concurrency=fcfg.get("max_concurrency"),
+        rate_limit_backoff_seconds=fcfg.get("rate_limit_backoff_seconds"),
+        max_attempts=fcfg.get("max_attempts"),
+    )
+
     # Stage 1 — universe
     records = build_universe(cfg, force=force_universe)
     log.info("universe: %d", len(records))

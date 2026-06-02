@@ -50,10 +50,6 @@ class Config:
 
     # Convenience accessors used across the codebase ---------------------------
     @property
-    def reporting_currency(self) -> str:
-        return self.raw.get("reporting_currency", "USD")
-
-    @property
     def enabled_regions(self) -> list[str]:
         regions = self.raw.get("universe", {}).get("regions", {})
         return [r for r, on in regions.items() if on]

@@ -107,39 +107,59 @@ def _build_from_financedatabase(cfg: Config) -> list[StockRecord]:
     return out
 
 
-def build_universe(cfg: Config, force: bool = False) -> list[StockRecord]:
-    """Return the (cached) universe of candidate equities."""
-    refresh_days = cfg.universe.get("refresh_days", 7)
-    if not force and _is_fresh(_UNIVERSE_PATH, refresh_days):
-        try:
-            data = json.loads(_UNIVERSE_PATH.read_text())
-            return [StockRecord.from_dict(d) for d in data]
-        except Exception as e:
-            log.warning("universe cache unreadable, rebuilding: %s", e)
+def _apply_shard_and_cap(records: list[StockRecord], cfg: Config) -> list[StockRecord]:
+    """Optionally split the universe across runs, then cap per-run size.
 
-    try:
-        records = _build_from_financedatabase(cfg)
-        if not records:
-            raise RuntimeError("financedatabase returned 0 rows after filtering")
-    except Exception as e:
-        log.warning("financedatabase unavailable (%s); using seed list", e)
-        records = [
-            StockRecord(ticker=t, name=n, region=r, exchange=ex, sector=sec, currency=c)
-            for (t, n, r, ex, sec, c) in _SEED
-            if cfg.universe.regions.get(r, False)
-        ]
-
-    records = _dedupe_cross_listings(records)
+    Applied on EVERY call (not baked into the cache) so changing `max_tickers`,
+    `shard_count`, or `shard_index` takes effect on the next run without waiting
+    for the weekly universe refresh.
+    """
+    shard_count = int(cfg.universe.get("shard_count", 1) or 1)
+    shard_index = int(cfg.universe.get("shard_index", 0) or 0)
+    if shard_count > 1:
+        shard_index %= shard_count
+        records = [r for i, r in enumerate(records) if i % shard_count == shard_index]
 
     cap = cfg.universe.get("max_tickers")
     if cap:
         records = records[: int(cap)]
-
-    _UNIVERSE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        _UNIVERSE_PATH.write_text(json.dumps([r.to_dict() for r in records]))
-    except Exception as e:  # pragma: no cover
-        log.warning("could not write universe cache: %s", e)
-
-    log.info("universe: %d tickers across regions", len(records))
     return records
+
+
+def build_universe(cfg: Config, force: bool = False) -> list[StockRecord]:
+    """Return the universe of candidate equities (cached full list, then sharded/capped)."""
+    refresh_days = cfg.universe.get("refresh_days", 7)
+    records: list[StockRecord] | None = None
+    if not force and _is_fresh(_UNIVERSE_PATH, refresh_days):
+        try:
+            data = json.loads(_UNIVERSE_PATH.read_text())
+            records = [StockRecord.from_dict(d) for d in data]
+        except Exception as e:
+            log.warning("universe cache unreadable, rebuilding: %s", e)
+
+    if records is None:
+        try:
+            records = _build_from_financedatabase(cfg)
+            if not records:
+                raise RuntimeError("financedatabase returned 0 rows after filtering")
+        except Exception as e:
+            log.warning("financedatabase unavailable (%s); using seed list", e)
+            records = [
+                StockRecord(ticker=t, name=n, region=r, exchange=ex, sector=sec, currency=c)
+                for (t, n, r, ex, sec, c) in _SEED
+                if cfg.universe.regions.get(r, False)
+            ]
+
+        records = _dedupe_cross_listings(records)
+
+        # Cache the FULL deduped universe; shard/cap are applied per-run below.
+        _UNIVERSE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            _UNIVERSE_PATH.write_text(json.dumps([r.to_dict() for r in records]))
+        except Exception as e:  # pragma: no cover
+            log.warning("could not write universe cache: %s", e)
+
+    selected = _apply_shard_and_cap(records, cfg)
+    log.info("universe: %d tickers across regions (%d after shard/cap)",
+             len(records), len(selected))
+    return selected

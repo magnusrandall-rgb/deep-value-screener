@@ -31,8 +31,12 @@ jobs:
 
       # Persist caches between runs so we only fetch incremental price updates
       # (and don't re-download full histories or rebuild the universe daily).
+      # Split restore/save so that even a run which hits timeout-minutes (and is
+      # therefore cancelled) still SAVES whatever it fetched — otherwise a slow
+      # cold-start run would lose all progress and the next run starts cold again.
       - name: Restore cache
-        uses: actions/cache@v4
+        id: cache-restore
+        uses: actions/cache/restore@v4
         with:
           path: data
           key: screener-data-${{ github.run_id }}
@@ -42,6 +46,15 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}  # only used if write_up.engine == llm
         run: python -m screener.run
+
+      # Save the (incrementally updated) cache unconditionally — if: always() so
+      # a timeout/cancel still persists the partial cache for the next run.
+      - name: Save cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: screener-data-${{ github.run_id }}
 
       # Results (CSV/JSON/markdown) are saved to data/results/ and surfaced by the
       # dashboard frontend; publish them as a build artifact for convenience.

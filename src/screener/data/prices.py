@@ -11,7 +11,7 @@ from typing import Optional
 
 import pandas as pd
 
-from .rate_limit import DataUnavailable, with_backoff
+from .rate_limit import DataUnavailable, is_rate_limited, with_backoff
 
 log = logging.getLogger("screener.prices")
 
@@ -34,6 +34,10 @@ def fetch_history(ticker: str, start: Optional[str] = None, period: str = "max")
         else:
             df = tk.history(period=period, auto_adjust=True)
     except Exception as e:
+        # A 429 must propagate so with_backoff can wait and retry; other errors
+        # (delisted, bad symbol) are per-ticker duds we skip with an empty frame.
+        if is_rate_limited(e):
+            raise DataUnavailable(f"rate limited fetching {ticker}: {e}")
         log.warning("price fetch failed for %s: %s", ticker, e)
         return pd.DataFrame()
 

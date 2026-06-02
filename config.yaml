@@ -11,7 +11,7 @@ price:
 
 # --- Stage 0: hard floor (applied before everything) ---------------------------
 floor:
-  min_market_cap: 300_000_000          # in reporting_currency
+  min_market_cap: 300_000_000          # in the security's NATIVE currency (FX normalization removed)
   min_avg_daily_dollar_volume: 1_000_000
   min_years_listed: 5
 
@@ -55,14 +55,28 @@ universe:
     China:   [".HK"]                   # HK + US ADRs are the main Chinese exposure
     China_a_shares: [".SS", ".SZ"]     # only used if include_a_shares: true
   excluded_exchanges: []               # exact Yahoo suffixes to drop entirely
-  max_tickers: null                    # null = no cap (screen the full universe). Set an
-                                       # int only to throttle a local smoke test.
+  max_tickers: 2000                    # Cap per run to keep the cold-start fetch within
+                                       # Yahoo's rate limits. The incremental cache fills
+                                       # over successive runs, so ramp this up gradually
+                                       # (e.g. 2000 -> 5000 -> null) as the cache warms.
+  # Optional: split the universe across runs so each run fetches a survivable
+  # slice (run N screens tickers where index % shard_count == shard_index).
+  # Defaults (count 1 / index 0) mean no sharding.
+  shard_count: 1
+  shard_index: 0
 
 # --- Stage 5: write-up ---------------------------------------------------------
 write_up:
   engine: templated                    # "templated" (free, default) | "llm"
   model: claude-haiku-4-5-20251001     # used only if engine == llm
   max_output_tokens: 600               # per write-up cap (llm only)
+
+# --- Data fetch throttling (avoid Yahoo 429s) ---------------------------------
+fetch:
+  request_delay_seconds: 0.5           # min spacing between yfinance network calls
+  max_concurrency: 1                   # cap simultaneous in-flight requests
+  rate_limit_backoff_seconds: 60       # on a 429, wait this long before retrying
+  max_attempts: 4                      # total tries per call before giving up
 
 # --- Stage 6: feedback & self-learning ----------------------------------------
 feedback:
@@ -73,8 +87,9 @@ feedback:
   outcomes_path: data/outcomes.csv
 
 # --- Global --------------------------------------------------------------------
-reporting_currency: USD
-
+# FX normalization was removed: all monetary figures stay in each security's
+# native currency (recorded per row), avoiding extra Yahoo FX requests.
+#
 # Results are logged to the terminal and saved to data/results/ (CSV, JSON,
 # markdown) for the dashboard frontend. There is no email/SMTP delivery.
 

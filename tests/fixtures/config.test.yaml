@@ -43,6 +43,10 @@ feedback:
   suppress_previously_rejected: false
   calibration_cadence_days: 30
   outcomes_path: data/outcomes.csv
-reporting_currency: USD
+fetch:
+  request_delay_seconds: 0.0
+  max_concurrency: 1
+  rate_limit_backoff_seconds: 1
+  max_attempts: 2
 schedule:
   cron: "0 6 * * 1-5"

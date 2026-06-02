@@ -26,7 +26,7 @@ class StockRecord:
     region: str = ""
     exchange: str = ""
     sector: str = ""
-    currency: str = ""                # native reporting currency of the security
+    currency: str = ""                # native reporting currency (from yfinance financialCurrency)
 
     # --- price screen (Stage 2) ----------------------------------------------
     price: Optional[float] = None             # latest close, native currency
@@ -36,8 +36,8 @@ class StockRecord:
     pct_off_ath: Optional[float] = None       # 0..100, how far below ATH
     low_52w: Optional[float] = None
     pct_above_52w_low: Optional[float] = None # 0..inf, distance above the 52w low
-    market_cap: Optional[float] = None        # normalized to reporting_currency
-    avg_dollar_volume: Optional[float] = None # normalized to reporting_currency
+    market_cap: Optional[float] = None        # native currency (see `currency`)
+    avg_dollar_volume: Optional[float] = None # native currency (see `currency`)
     years_listed: Optional[float] = None
 
     # --- quality (Stage 3) ----------------------------------------------------

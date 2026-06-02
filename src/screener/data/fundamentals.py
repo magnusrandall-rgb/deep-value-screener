@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from .rate_limit import DataUnavailable, with_backoff
+from .rate_limit import DataUnavailable, is_rate_limited, with_backoff
 
 log = logging.getLogger("screener.fundamentals")
 
@@ -87,6 +87,10 @@ def fetch_fundamentals(ticker: str, region: str) -> dict:
         bs = tk.balance_sheet
         cf = tk.cashflow
     except Exception as e:
+        # A 429 must propagate so with_backoff can wait and retry; other errors
+        # are per-ticker duds we skip by returning the empty (flagged) dict.
+        if is_rate_limited(e):
+            raise DataUnavailable(f"rate limited fetching {ticker}: {e}")
         log.warning("fundamentals fetch failed for %s: %s", ticker, e)
         return out
 

@@ -8,7 +8,9 @@ ATH handling: prefer a true ATH; otherwise use the max over available history,
 mark ath_is_approx=True, and SCORE ath_confidence per ticker (short/sparse/
 gappy histories score low). Never present an approximation as a hard figure.
 
-This stage also normalizes market cap & dollar volume to the reporting currency.
+Market cap & dollar volume are kept in each security's NATIVE currency (FX
+normalization was removed to avoid extra Yahoo requests); `r.currency` records
+which currency that is.
 """
 from __future__ import annotations
 
@@ -17,7 +19,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from .. import cache, currency
+from .. import cache
 from ..config import Config
 from ..schema import StockRecord
 
@@ -53,7 +55,6 @@ def screen_prices(records: list[StockRecord], cfg: Config,
     pct_off = cfg.price.get("pct_off_ath", 50)
     pct_above = cfg.price.get("pct_above_52w_low", 20)
     ath_mode = cfg.price.get("ath_mode", "approx-allowed")
-    report_ccy = cfg.reporting_currency
 
     kept: list[StockRecord] = []
     for r in records:
@@ -92,12 +93,9 @@ def screen_prices(records: list[StockRecord], cfg: Config,
         r.pct_above_52w_low = round(pct_above_low, 1)
         r.years_listed = _years_listed(hist)
 
-        # Average dollar volume (60d), normalized to reporting currency.
+        # Average dollar volume (60d), in the security's native currency.
         vol = (hist["Close"] * hist["Volume"]).tail(60).mean()
-        adv_native = float(vol) if vol == vol else None
-        r.avg_dollar_volume = currency.convert(
-            adv_native, r.currency or report_ccy, report_ccy, allow_fetch=allow_fetch
-        ) if adv_native else None
+        r.avg_dollar_volume = float(vol) if vol == vol else None
 
         kept.append(r)
 
@@ -107,18 +105,18 @@ def screen_prices(records: list[StockRecord], cfg: Config,
 
 def attach_market_cap(records: list[StockRecord], cfg: Config,
                       allow_fetch: bool = True) -> list[StockRecord]:
-    """Market cap from cached fundamentals' share count x price, FX-normalized.
+    """Market cap from cached fundamentals' share count x price, native currency.
 
     Kept separate from screen_prices so the floor can run on real figures while
     avoiding a fundamentals pull for names that already failed the price screen.
     """
-    report_ccy = cfg.reporting_currency
     for r in records:
         f = cache.get_fundamentals(r.ticker, r.region, allow_fetch=allow_fetch)
         shares = f.get("share_count") or []
-        ccy = f.get("currency") or r.currency or report_ccy
+        # Native reporting currency from yfinance (financialCurrency), if known.
+        ccy = f.get("currency") or r.currency
         if shares and r.price:
-            cap_native = shares[0] * r.price
-            r.market_cap = currency.convert(cap_native, ccy, report_ccy, allow_fetch=allow_fetch)
-        r.currency = ccy
+            r.market_cap = shares[0] * r.price
+        if ccy:
+            r.currency = ccy
     return records
