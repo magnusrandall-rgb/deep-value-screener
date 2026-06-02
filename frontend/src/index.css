@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+/* ---- Trading-terminal theme: near-black charcoal, hairlines, one green ---- */
+@theme {
+  --color-bg: #0a0c10;
+  --color-panel: #0d1117;
+  --color-panel-2: #11161e;
+  --color-raised: #161c25;
+  --color-line: #1c232d;
+  --color-line-bright: #2a323d;
+
+  --color-ink: #e6edf3;
+  --color-muted: #8b949e;
+  --color-faint: #59616c;
+
+  --color-green: #3fb950;
+  --color-green-bright: #56d364;
+  --color-green-dim: #196c2e;
+
+  --color-red: #f85149;
+  --color-amber: #d29922;
+  --color-blue: #58a6ff;
+
+  --font-sans: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: color-mix(in oklab, var(--color-green) 32%, transparent);
+    color: #fff;
+  }
+  /* thin, unobtrusive terminal scrollbars */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line-bright) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-line-bright);
+    border-radius: 99px;
+    border: 2px solid var(--color-bg);
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+@layer utilities {
+  .nums {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+  /* faint dotted grid texture for empty/atmosphere areas */
+  .grid-texture {
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      var(--color-line) 1px,
+      transparent 0
+    );
+    background-size: 22px 22px;
+  }
+}

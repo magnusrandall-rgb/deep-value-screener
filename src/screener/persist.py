@@ -33,11 +33,26 @@ def latest_prior_run(before: Optional[str] = None) -> Optional[str]:
     return runs[-1] if runs else None
 
 
-def load_run(run_date: str) -> list[StockRecord]:
+def _read_payload(path: Path) -> tuple[list[dict], Optional[int]]:
+    """Return (record dicts, universe_size), tolerating both the legacy bare-array
+    file format and the newer {"records": [...], "universe_size": N} object."""
+    raw = json.loads(path.read_text())
+    if isinstance(raw, list):            # legacy: a bare array of records
+        return raw, None
+    return raw.get("records", []), raw.get("universe_size")
+
+
+def read_run(run_date: str) -> tuple[list[dict], Optional[int]]:
+    """Raw record dicts + universe_size for a run (empty/None if absent)."""
     p = _results_path(run_date)
     if not p.exists():
-        return []
-    return [StockRecord.from_dict(d) for d in json.loads(p.read_text())]
+        return [], None
+    return _read_payload(p)
+
+
+def load_run(run_date: str) -> list[StockRecord]:
+    records, _ = read_run(run_date)
+    return [StockRecord.from_dict(d) for d in records]
 
 
 def diff_against_prior(records: list[StockRecord]) -> list[StockRecord]:
@@ -50,12 +65,19 @@ def diff_against_prior(records: list[StockRecord]) -> list[StockRecord]:
     return records
 
 
-def save_run(records: list[StockRecord], run_date: Optional[str] = None) -> tuple[Path, Path]:
+def save_run(records: list[StockRecord], run_date: Optional[str] = None,
+             universe_size: Optional[int] = None) -> tuple[Path, Path]:
     run_date = run_date or date.today().isoformat()
     _RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     json_path = _results_path(run_date)
-    json_path.write_text(json.dumps([r.to_dict() for r in records], default=str))
+    payload = {
+        "date": run_date,
+        "universe_size": universe_size,   # tickers actually screened this run
+        "count": len(records),
+        "records": [r.to_dict() for r in records],
+    }
+    json_path.write_text(json.dumps(payload, default=str))
 
     csv_path = _RESULTS_DIR / f"{run_date}.csv"
     with csv_path.open("w", newline="") as fh:

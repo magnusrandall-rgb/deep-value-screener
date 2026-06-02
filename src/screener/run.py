@@ -83,14 +83,16 @@ def main(argv: list[str] | None = None) -> int:
     run_date = date.today().isoformat()
 
     cfg = load_config()
+    stats: dict = {}
     try:
-        records = run_pipeline(cfg, allow_fetch=not offline, force_universe=force_universe)
+        records = run_pipeline(cfg, allow_fetch=not offline,
+                               force_universe=force_universe, stats=stats)
     except Exception:
         tb = traceback.format_exc()
         notify.report_failure(tb, run_date)
         return 1
 
-    persist.save_run(records, run_date)
+    persist.save_run(records, run_date, universe_size=stats.get("universe_size"))
     feedback.record_outcomes(records, cfg, when=run_date)
     digest = feedback.calibration_digest(cfg)
 

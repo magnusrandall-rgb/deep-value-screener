@@ -18,7 +18,6 @@ Endpoints (all under /api):
 """
 from __future__ import annotations
 
-import json
 import re
 from typing import Optional
 
@@ -57,13 +56,10 @@ def _run_dates() -> list[str]:
     return sorted((p.stem for p in d.glob("*.json")), reverse=True)
 
 
-def _load_records(run_date: str) -> list[dict]:
-    """Raw record dicts for a run (reads the JSON the screener wrote)."""
-    path = persist._results_path(run_date)
-    if not path.exists():
-        return []
+def _read_run(run_date: str) -> tuple[list[dict], Optional[int]]:
+    """(record dicts, universe_size) for a run — the JSON the screener wrote."""
     try:
-        return json.loads(path.read_text())
+        return persist.read_run(run_date)
     except Exception as e:  # corrupt/partial file — surface as a 500, don't crash
         raise HTTPException(status_code=500, detail=f"could not read run {run_date}: {e}")
 
@@ -86,8 +82,14 @@ def root() -> dict:
 
 @app.get("/api/runs")
 def list_runs() -> list[dict]:
-    """List past run dates with how many names each surfaced (newest first)."""
-    return [{"date": d, "count": len(_load_records(d))} for d in _run_dates()]
+    """List past run dates with surfaced + new-entrant counts (newest first)."""
+    out = []
+    for d in _run_dates():
+        recs, universe_size = _read_run(d)
+        new = sum(1 for r in recs if r.get("is_new_entrant"))
+        out.append({"date": d, "count": len(recs), "new": new,
+                    "universe_size": universe_size})
+    return out
 
 
 @app.get("/api/runs/latest")
@@ -97,8 +99,9 @@ def latest_run() -> dict:
     if not dates:
         raise HTTPException(status_code=404, detail="no runs saved yet")
     date = dates[0]
-    records = _load_records(date)
-    return {"date": date, "count": len(records), "records": records}
+    records, universe_size = _read_run(date)
+    return {"date": date, "count": len(records),
+            "universe_size": universe_size, "records": records}
 
 
 @app.get("/api/runs/{date}")
@@ -108,8 +111,9 @@ def run_by_date(date: str) -> dict:
         raise HTTPException(status_code=400, detail="date must be YYYY-MM-DD")
     if date not in _run_dates():
         raise HTTPException(status_code=404, detail=f"no run for {date}")
-    records = _load_records(date)
-    return {"date": date, "count": len(records), "records": records}
+    records, universe_size = _read_run(date)
+    return {"date": date, "count": len(records),
+            "universe_size": universe_size, "records": records}
 
 
 @app.get("/api/decisions")

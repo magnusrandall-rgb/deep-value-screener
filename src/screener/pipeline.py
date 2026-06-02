@@ -20,7 +20,10 @@ log = logging.getLogger("screener.pipeline")
 
 
 def run_pipeline(cfg: Config, allow_fetch: bool = True,
-                 force_universe: bool = False) -> list[StockRecord]:
+                 force_universe: bool = False,
+                 stats: dict | None = None) -> list[StockRecord]:
+    """Run the funnel. If `stats` is given, it's filled with run metadata
+    (currently `universe_size` = the number of tickers screened)."""
     # Configure the network throttle from config so every live fetch is spaced
     # out and backs off politely on a Yahoo 429 (no-op when allow_fetch=False).
     fcfg = cfg.raw.get("fetch", {}) or {}
@@ -33,6 +36,8 @@ def run_pipeline(cfg: Config, allow_fetch: bool = True,
 
     # Stage 1 — universe
     records = build_universe(cfg, force=force_universe)
+    if stats is not None:
+        stats["universe_size"] = len(records)   # tickers screened (post shard/cap)
     log.info("universe: %d", len(records))
 
     # Stage 2 — price screen (also fills price-derived floor inputs)

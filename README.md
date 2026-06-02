@@ -60,6 +60,19 @@ uvicorn src.api.main:app --reload         # serves on http://127.0.0.1:8000
 CORS is enabled for any `localhost`/`127.0.0.1` port so the React dev server can
 call it. Interactive docs: <http://127.0.0.1:8000/docs>.
 
+### Frontend dashboard
+
+A dark, dense "trading-terminal" dashboard lives in [`frontend/`](frontend/)
+(Vite + React + Tailwind). Start the API above, then:
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173 (reads the API at VITE_API_URL, default :8000)
+```
+
+See [`frontend/README.md`](frontend/README.md) for details.
+
 ### Credentials (free)
 The screener needs no paid data and no email credentials. The only optional
 secret is for the LLM write-up engine:
