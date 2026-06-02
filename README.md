@@ -39,6 +39,27 @@ python -m screener.run              # full daily run: fetch, log, save to data/r
 Each run logs a ranked summary to the terminal and writes `data/results/<date>.{csv,json,md}`.
 There is no email delivery — a dashboard frontend reads those files.
 
+### API backend (serves results to the frontend)
+
+A small FastAPI app exposes the saved runs and the decisions log to the frontend
+(it reads the same `data/` files — no separate database). From the project root:
+
+```bash
+pip install -e .                          # installs fastapi + uvicorn too
+uvicorn src.api.main:app --reload         # serves on http://127.0.0.1:8000
+```
+
+| Endpoint | Returns |
+|----------|---------|
+| `GET /api/runs` | past run dates with result counts |
+| `GET /api/runs/latest` | the most recent run's full results (JSON) |
+| `GET /api/runs/{date}` | a specific run's results (`date` = `YYYY-MM-DD`) |
+| `GET /api/decisions` | all decisions, keyed by ticker (for labels) |
+| `POST /api/decisions` | log a decision `{ticker, decision, note}` |
+
+CORS is enabled for any `localhost`/`127.0.0.1` port so the React dev server can
+call it. Interactive docs: <http://127.0.0.1:8000/docs>.
+
 ### Credentials (free)
 The screener needs no paid data and no email credentials. The only optional
 secret is for the LLM write-up engine:
