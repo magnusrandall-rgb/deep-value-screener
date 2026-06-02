@@ -12,6 +12,11 @@ Bear/base/bull fair values come from config deltas on both the margin and the
 multiple. Names below the return hurdle are kept but ranked lower — a noisy
 fair-value estimate must never silently drop a good idea.
 
+Ranking is by base-case upside, by default weighted by data_confidence
+(`confidence_weighted_ranking`, default true) so a high-upside but low-confidence
+name ranks below a solid, high-confidence one. Raw upside and confidence stay as
+separate visible columns; only the sort order changes — nothing is filtered.
+
 Explicit caveat carried on every record: "normalized from history" can mislead
 during a genuine structural de-rating (the market may have re-rated correctly).
 """
@@ -131,6 +136,41 @@ def _historical_multiple(rec: StockRecord, cfg: Config) -> tuple[float, str, boo
     return round(band, 1), "fallback-band", True
 
 
+def _ranking_key(r: StockRecord, hurdle: float, confidence_weighted: bool) -> tuple:
+    """Sort key (higher = better, used with reverse=True).
+
+    Primary ordering is base-case upside, optionally weighted by data_confidence
+    so a noisy high-upside name ranks below a solid name with high confidence.
+    Raw upside and confidence remain untouched on the record (both stay visible);
+    only the ORDER changes — nothing is dropped, preserving the false-positive bias.
+    Names with no upside estimate sink to the bottom but are still kept.
+    """
+    if r.upside_base is None:
+        return (0, -99.0, r.quality_score or 0, r.data_confidence or 0.0)
+    base = r.upside_base
+    conf = r.data_confidence if r.data_confidence is not None else 0.0
+    primary = base * conf if confidence_weighted else base
+    meets = 1 if base >= hurdle else 0  # above-hurdle names float up, others kept
+    return (meets, primary, r.quality_score or 0, conf)
+
+
+def rank_records(records: list[StockRecord], cfg: Config) -> list[StockRecord]:
+    """Order the list and assign 1-based ranks. Ranking only — never filters."""
+    v = cfg.valuation
+    hurdle = v.get("annual_return_hurdle", 0.30)
+    confidence_weighted = v.get("confidence_weighted_ranking", True)
+    ranked = sorted(
+        records,
+        key=lambda r: _ranking_key(r, hurdle, confidence_weighted),
+        reverse=True,
+    )
+    for i, r in enumerate(ranked, 1):
+        r.rank = i
+    log.info("Stage 4 valuation: ranked %d names (hurdle %.0f%% used for ordering only, "
+             "confidence_weighted=%s)", len(ranked), hurdle * 100, confidence_weighted)
+    return ranked
+
+
 def value_stocks(records: list[StockRecord], cfg: Config) -> list[StockRecord]:
     v = cfg.valuation
     horizon = v.get("horizon_years", 3)
@@ -212,18 +252,5 @@ def value_stocks(records: list[StockRecord], cfg: Config) -> list[StockRecord]:
         r.upside_bull = annualized(r.fair_value_bull)
         r.valuation_assumptions = assumptions
 
-    # ---- rank: base-case upside primary, quality & confidence as tiebreaks ---
-    hurdle = v.get("annual_return_hurdle", 0.30)
-
-    def sort_key(r: StockRecord):
-        base = r.upside_base if r.upside_base is not None else -99
-        meets = 1 if base >= hurdle else 0  # above-hurdle names float up, others kept
-        return (meets, base, r.quality_score or 0, r.data_confidence)
-
-    ranked = sorted(records, key=sort_key, reverse=True)
-    for i, r in enumerate(ranked, 1):
-        r.rank = i
-
-    log.info("Stage 4 valuation: ranked %d names (hurdle %.0f%% used for ordering only)",
-             len(ranked), hurdle * 100)
-    return ranked
+    # ---- rank (base-case upside, optionally confidence-weighted) -------------
+    return rank_records(records, cfg)

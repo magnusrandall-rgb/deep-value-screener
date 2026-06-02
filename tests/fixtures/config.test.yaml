@@ -19,6 +19,7 @@ quality:
   drop_if_never_profitable_last_n_years: 5
 valuation:
   annual_return_hurdle: 0.30
+  confidence_weighted_ranking: true
   bear_base_bull_deltas:
     margin: [-0.30, 0.0, 0.30]
     multiple: [-0.25, 0.0, 0.25]

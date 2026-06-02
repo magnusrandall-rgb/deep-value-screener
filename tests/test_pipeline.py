@@ -65,6 +65,29 @@ def test_valuation_ranks_but_does_not_gate():
     assert all(r.rank is not None for r in ranked)
 
 
+def test_confidence_weighted_ranking_reorders_but_keeps_all():
+    cfg = load_config()
+    # Raw upside would rank NOISY (100%) above SOLID (60%); confidence weighting
+    # flips it (100%*0.5=0.50 < 60%*0.95=0.57) — solid high-confidence name wins.
+    noisy = StockRecord(ticker="NOISY", upside_base=1.0, data_confidence=0.5, quality_score=30)
+    solid = StockRecord(ticker="SOLID", upside_base=0.6, data_confidence=0.95, quality_score=90)
+    ranked = valuation.rank_records([noisy, solid], cfg)
+    assert [r.ticker for r in ranked] == ["SOLID", "NOISY"]
+    # nothing dropped; raw upside & confidence untouched (still visible columns)
+    assert {r.ticker for r in ranked} == {"NOISY", "SOLID"}
+    assert noisy.upside_base == 1.0 and solid.upside_base == 0.6
+    assert noisy.data_confidence == 0.5 and solid.data_confidence == 0.95
+
+
+def test_ranking_toggle_off_uses_raw_upside():
+    cfg = load_config()
+    cfg.raw["valuation"]["confidence_weighted_ranking"] = False
+    noisy = StockRecord(ticker="NOISY", upside_base=1.0, data_confidence=0.5, quality_score=30)
+    solid = StockRecord(ticker="SOLID", upside_base=0.6, data_confidence=0.95, quality_score=90)
+    ranked = valuation.rank_records([noisy, solid], cfg)
+    assert [r.ticker for r in ranked] == ["NOISY", "SOLID"]  # raw upside ordering
+
+
 def test_ath_confidence_scored():
     cfg = load_config()
     records = run_pipeline(cfg, allow_fetch=False)

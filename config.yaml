@@ -40,6 +40,10 @@ quality:
 # --- Stage 4: valuation / upside (RANKING ONLY — never a hard gate) ------------
 valuation:
   annual_return_hurdle: 0.30           # ~30%/yr target, used to rank not to cut
+  confidence_weighted_ranking: true    # rank by upside x data_confidence (true) so noisy
+                                       # high-upside names sink below solid high-confidence
+                                       # ones; set false for raw-upside ranking. Sort only —
+                                       # never changes what's included.
   bear_base_bull_deltas:
     margin: [-0.30, 0.0, 0.30]         # multiplicative deltas vs normalized margin
     multiple: [-0.25, 0.0, 0.25]       # multiplicative deltas vs normalized multiple
